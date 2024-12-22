@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graph Algorithm Visualization</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #graph-container {
+            margin: 20px;
+            width: 80%;
+            height: 80vh;
+            background-color: white;
+            border: 2px solid #ccc;
+            position: relative;
+            overflow: auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .node {
+            width: 40px;
+            height: 40px;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 40px;
+            position: absolute;
+            cursor: pointer;
+        }
+        .edge {
+            position: absolute;
+            background-color: black;
+            height: 2px;
+            transform-origin: top left;
+        }
+        .cost-label {
+            position: absolute;
+            background-color: white;
+            border: 1px solid #ccc;
+            padding: 2px;
+            font-size: 12px;
+        }
+        #controls {
+            display: flex;
+            flex-direction: column;
+            margin: 20px;
+        }
+        .input-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        input {
+            padding: 5px;
+        }
+        button {
+            padding: 10px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #output {
+            margin: 20px;
+            padding: 10px;
+            background-color: white;
+            border: 1px solid #ccc;
+            width: 80%;
+        }
+    </style>
+</head>
+<body>
+    <h1>Graph Algorithm Visualization</h1>
+    <div id="graph-container"></div>
+    <div id="controls">
+        <div class="input-row">
+            <input id="from-node" placeholder="From City">
+            <input id="to-node" placeholder="To City">
+            <input id="cost" type="number" placeholder="Cost">
+            <button onclick="addEdge()">Add Path</button>
+        </div>
+        <div class="input-row">
+            <button onclick="startAlgorithm('BFS')">Run BFS</button>
+            <button onclick="startAlgorithm('DFS')">Run DFS</button>
+            <button onclick="startAlgorithm('UCS')">Run UCS</button>
+        </div>
+        <button onclick="resetGraph()">Reset</button>
+    </div>
+    <div id="output">
+        <h3>Results</h3>
+        <p id="result-path">Path: </p>
+        <p id="result-cost">Total Cost: </p>
+        <p id="result-steps">Time Complexity (Steps): </p>
+    </div>
+    <script>
+        let graph = {};
+        let nodes = {};
+        let positions = {};
+        let siblingCounts = {}; 
+
+        function addEdge() {
+            const from = document.getElementById('from-node').value;
+            const to = document.getElementById('to-node').value;
+            const cost = parseInt(document.getElementById('cost').value);
+
+            if (!graph[from]) graph[from] = [];
+            graph[from].push({ to, cost });
+
+            if (!graph[to]) graph[to] = [];
+
+            if (!nodes[from]) createNode(from, 0, 400);
+            if (!nodes[to]) {
+                const parentPos = positions[from];
+                const siblingCount = siblingCounts[parentPos.level + 1] || 0;
+                const xPosition = parentPos.x + (siblingCount * 100 - (siblingCounts[parentPos.level] || 0) * 50);
+
+                siblingCounts[parentPos.level + 1] = siblingCount + 1;
+                createNode(to, parentPos.level + 1, xPosition);
+            }
+
+            createEdge(from, to, cost);
+        }
+
+        function createNode(name, level, xPosition) {
+            const container = document.getElementById('graph-container');
+            const node = document.createElement('div');
+            node.className = 'node';
+            node.textContent = name;
+
+            const yPosition = level * 100 + 20;
+
+            node.style.left = `${xPosition}px`;
+            node.style.top = `${yPosition}px`;
+
+            container.appendChild(node);
+            nodes[name] = node;
+            positions[name] = { level, x: xPosition };
+        }
+
+        function createEdge(from, to, cost) {
+            const container = document.getElementById('graph-container');
+            const fromNode = nodes[from];
+            const toNode = nodes[to];
+
+            const x1 = fromNode.offsetLeft + 20;
+            const y1 = fromNode.offsetTop + 20;
+            const x2 = toNode.offsetLeft + 20;
+            const y2 = toNode.offsetTop + 20;
+
+            const edge = document.createElement('div');
+            edge.className = 'edge';
+            edge.style.left = `${x1}px`;
+            edge.style.top = `${y1}px`;
+
+            const length = Math.hypot(x2 - x1, y2 - y1);
+            edge.style.width = `${length}px`;
+
+            const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
+            edge.style.transform = `rotate(${angle}deg)`;
+
+            container.appendChild(edge);
+
+            const costLabel = document.createElement('div');
+            costLabel.className = 'cost-label';
+            costLabel.textContent = cost;
+            costLabel.style.left = `${(x1 + x2) / 2}px`;
+            costLabel.style.top = `${(y1 + y2) / 2}px`;
+            container.appendChild(costLabel);
+        }
+
+        function startAlgorithm(type) {
+            const start = prompt('Enter start city:').trim();
+            const end = prompt('Enter destination city:').trim();
+
+            if (!(start in graph) || !(end in graph)) {
+                alert('Invalid start or end city');
+                return;
+            }
+
+            let result;
+            if (type === 'BFS') {
+                result = bfs(start, end);
+            } else if (type === 'DFS') {
+                result = dfs(start, end);
+            } else if (type === 'UCS') {
+                result = ucs_with_path(start, end);
+            }
+
+            document.getElementById('result-path').textContent = `Path: ${result.path.join(' -> ')}`;
+            document.getElementById('result-cost').textContent = `Total Cost: ${result.cost}`;
+            document.getElementById('result-steps').textContent = `Time Complexity (Steps): ${result.steps}`;
+        }
+
+        function dfs(start, end) {
+            let visited = new Set();
+            let path = [];
+            let steps = 0;
+
+            function dfsRecursive(node) {
+                if (node === end) {
+                    path.push(node);
+                    return true;
+                }
+                visited.add(node);
+                path.push(node);
+                steps++;
+
+                for (let neighbor of graph[node] || []) {
+                    if (!visited.has(neighbor.to)) {
+                        if (dfsRecursive(neighbor.to)) {
+                            return true;
+                        }
+                    }
+                }
+
+                path.pop();
+                return false;
+            }
+
+            dfsRecursive(start);
+            return { path, cost: path.length - 1, steps };
+        }
+
+        function bfs(start, end) {
+            let visited = [];
+            let queue = [start];
+            let steps = 0;
+            let path = [];
+
+            while (queue.length > 0) {
+                steps++;
+                let node = queue.shift();
+                path.push(node);
+
+                if (node === end) {
+                    return { path, cost: path.length - 1, steps };
+                }
+
+                if (!visited.includes(node)) {
+                    visited.push(node);
+                    for (let neighbor of graph[node] || []) {
+                        if (!visited.includes(neighbor.to)) {
+                            queue.push(neighbor.to);
+                        }
+                    }
+                }
+            }
+
+            return { path: [], cost: 0, steps };
+        }
+
+        function ucs_with_path(start, goal) {
+            const queue = [];
+            queue.push([0, start]);
+            const visited = new Set();
+            const cost = {};
+            const parent = {};
+            cost[start] = 0;
+            parent[start] = null;
+            let steps = 0;
+
+            while (queue.length > 0) {
+                queue.sort((a, b) => a[0] - b[0]);
+                const [currentCost, currentNode] = queue.shift();
+
+                if (currentNode === goal) {
+                    let path = [];
+                    let node = currentNode;
+                    while (node !== null) {
+                        path.unshift(node);
+                        node = parent[node];
+                    }
+                    return { path, cost: currentCost, steps };
+                }
+
+                if (!visited.has(currentNode)) {
+                    visited.add(currentNode);
+                    for (let { to, cost: edgeCost } of graph[currentNode] || []) {
+                        const newCost = currentCost + edgeCost;
+                        if (cost[to] === undefined || newCost < cost[to]) {
+                            cost[to] = newCost;
+                            parent[to] = currentNode;
+                            queue.push([newCost, to]);
+                        }
+                    }
+                }
+
+                steps++;
+            }
+
+            return { path: [], cost: 0, steps };
+        }
+
+        // Reset the graph
+        function resetGraph() {
+            graph = {};
+            nodes = {};
+            document.getElementById('graph-container').innerHTML = '';
+            document.getElementById('result-path').textContent = 'Path: ';
+            document.getElementById('result-cost').textContent = 'Total Cost: ';
+            document.getElementById('result-steps').textContent = 'Time Complexity (Steps): ';
+        }
+    </script>
+</body>
+</html>
